@@ -1,0 +1,32 @@
+name: thuthanh2d
+description: "A new Flutter project."
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flame: ^1.32.0
+  shared_preferences: ^2.1.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/fruits/apple.png
+    - assets/images/fruits/pear.png
+    - assets/images/fruits/orange.png
+    - assets/images/fruits/lemon.png
+    - assets/images/fruits/watermelon.png
+    - assets/images/fruits/strawberry.png
+    - assets/images/items/bomb.png
+    - assets/images/items/time.png
+    - assets/images/items/x2.png
+
