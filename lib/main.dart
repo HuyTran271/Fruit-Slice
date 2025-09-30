@@ -258,8 +258,13 @@ class _GameScreenState extends State<GameScreen>
   @override
   void initState() {
     super.initState();
+    loadBestScore(widget.difficulty).then((value) {
+      setState(() {
+        bestScore = value;
+        controller.bestScore = bestScore;
+      });
+    });
     controller = GameController(widget.difficulty);
-    _loadBest();
     ticker = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 16))
       ..addListener(() => setState(() => controller.update(screenSize)))
@@ -282,7 +287,7 @@ class _GameScreenState extends State<GameScreen>
   void _onTimeUp() {
     if (controller.score > bestScore) {
       bestScore = controller.score;
-      _saveBest();
+      saveBestScore(widget.difficulty, bestScore);
     }
     showDialog(
       context: context,
@@ -678,4 +683,16 @@ class GamePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter old) => true;
+}
+
+// Hàm lưu best score
+Future<void> saveBestScore(String difficulty, int score) async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setInt('best_score_$difficulty', score);
+}
+
+// Hàm đọc best score
+Future<int> loadBestScore(String difficulty) async {
+  final prefs = await SharedPreferences.getInstance();
+  return prefs.getInt('best_score_$difficulty') ?? 0;
 }
