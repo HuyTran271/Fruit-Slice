@@ -20,13 +20,5 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - assets/images/fruits/apple.png
-    - assets/images/fruits/pear.png
-    - assets/images/fruits/orange.png
-    - assets/images/fruits/lemon.png
-    - assets/images/fruits/watermelon.png
-    - assets/images/fruits/strawberry.png
-    - assets/images/items/bomb.png
-    - assets/images/items/time.png
-    - assets/images/items/x2.png
+
 
