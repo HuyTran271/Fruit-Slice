@@ -9,11 +9,24 @@ class GamePainter extends CustomPainter {
   final List<Offset> trail;
   final List<SliceEffect> sliceEffects;
   final List<Color> trailColors;
+  final double devicePixelRatio;
 
-  GamePainter(this.c, this.trail, this.sliceEffects, [this.trailColors = const [Colors.red, Colors.yellow]]);
+  GamePainter(
+    this.c,
+    this.trail,
+    this.sliceEffects,
+    this.trailColors, {
+    this.devicePixelRatio = 1.0,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
+    // Scale canvas theo device pixel ratio
+    canvas.scale(1 / devicePixelRatio);
+
+    // Điều chỉnh các kích thước vẽ
+    final baseRadius = size.width / 15; // Radius cơ bản cho fruits/items
+
     // 🎯 Vẽ Fruit
     for (final f in c.fruits) {
       for (final p in f.particles) {

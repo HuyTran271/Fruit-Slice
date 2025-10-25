@@ -9,6 +9,7 @@ import '../entity/SliceEffect.dart';
 import '../extra/leaderboard.dart';
 import '../extra/audiomanager.dart';
 import '../entity/Item.dart';
+import '../reponsive/reponsive.dart';
 
 class GameScreen extends StatefulWidget {
   final String difficulty;
@@ -172,9 +173,10 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
+    Responsive.init(context);
     screenSize = MediaQuery.of(context).size;
     controller.screenSize = screenSize;
-    
+
     Color difficultyColor = widget.difficulty == 'Easy' ? Colors.green : widget.difficulty == 'Hard' ? Colors.red : Colors.orange;
     
     return Scaffold(
@@ -220,116 +222,149 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
         onPanEnd: (_) => setState(() => trail.clear()),
         child: Stack(
           children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 500),
+            // Background
+            Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: controller.x2Active ? [Colors.orange.shade300, Colors.deepOrange.shade400] : [Colors.lightBlue.shade200, Colors.green.shade300],
+                  colors: controller.x2Active
+                      ? [Colors.orange.shade300, Colors.deepOrange.shade400]
+                      : [Colors.lightBlue.shade200, Colors.green.shade300],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
               ),
             ),
-            CustomPaint(size: screenSize!, painter: GamePainter(controller, trail, sliceEffects, trailColors)),
-            
+
+            // Game Canvas với kích thước responsive
+            CustomPaint(
+              size: Size(Responsive.screenWidth, Responsive.screenHeight),
+              painter: GamePainter(
+                controller,
+                trail,
+                sliceEffects,
+                trailColors,
+                devicePixelRatio: Responsive.devicePixelRatio,
+              ),
+            ),
+
+            // Score Panel
             Positioned(
-              top: 30,
-              left: 16,
-              right: 16,
+              top: Responsive.hp(4), // 4% chiều cao màn hình
+              left: Responsive.wp(4), // 4% chiều rộng màn hình
+              right: Responsive.wp(4),
               child: Container(
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.all(Responsive.wp(3)),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.95),
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 5))],
+                  borderRadius: BorderRadius.circular(Responsive.radius(20)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: Responsive.radius(10),
+                      offset: Offset(0, Responsive.hp(0.5)),
+                    )
+                  ],
                 ),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
+                    // Score Section
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(color: difficultyColor.withOpacity(0.2), borderRadius: BorderRadius.circular(8)),
-                            child: Text(widget.difficulty, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: difficultyColor)),
+                          Text(
+                            "Score: ${controller.score}",
+                            style: TextStyle(
+                              fontSize: Responsive.fontSize(24),
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                          const SizedBox(height: 8),
-                          Text("🏆 ${controller.score}", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                          Text("Best: $bestScore", style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                          Text(
+                            "Best: $bestScore",
+                            style: TextStyle(
+                              fontSize: Responsive.fontSize(16),
+                              color: Colors.grey,
+                            ),
+                          ),
                         ],
                       ),
                     ),
+                    // Timer Section
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: controller.timeLeft <= 10 ? Colors.red.withOpacity(0.2) : Colors.blue.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(12),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: Responsive.wp(3),
+                            vertical: Responsive.hp(1),
                           ),
-                          child: Text("⏱️ ${controller.timeLeft}s", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: controller.timeLeft <= 10 ? Colors.red : Colors.blue)),
+                          decoration: BoxDecoration(
+                            color: controller.timeLeft <= 10
+                                ? Colors.red.withOpacity(0.2)
+                                : Colors.blue.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(Responsive.radius(10)),
+                          ),
+                          child: Text(
+                            "${controller.timeLeft}s",
+                            style: TextStyle(
+                              fontSize: Responsive.fontSize(20),
+                              fontWeight: FontWeight.bold,
+                              color: controller.timeLeft <= 10 ? Colors.red : Colors.blue,
+                            ),
+                          ),
                         ),
-                        const SizedBox(height: 8),
-                        Row(children: List.generate(controller.lives, (i) => const Padding(padding: EdgeInsets.only(left: 4), child: Text("❤️", style: TextStyle(fontSize: 20))))),
+                        SizedBox(height: Responsive.hp(1)),
+                        Row(
+                          children: List.generate(
+                            controller.lives,
+                            (i) => Padding(
+                              padding: EdgeInsets.only(left: Responsive.wp(1)),
+                              child: Text(
+                                "❤️",
+                                style: TextStyle(fontSize: Responsive.fontSize(20)),
+                              ),
+                            ),
+                          ),
+                        ),
                       ],
-                    )
+                    ),
                   ],
                 ),
               ),
             ),
-            
-            if (controller.x2Active)
-              Positioned(
-                top: 130,
-                right: 16,
-                child: TweenAnimationBuilder(
-                  tween: Tween<double>(begin: 0.9, end: 1.1),
-                  duration: const Duration(milliseconds: 500),
-                  curve: Curves.easeInOut,
-                  builder: (context, double scale, child) => Transform.scale(scale: scale, child: child),
-                  onEnd: () => setState(() {}),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(colors: [Colors.orange.shade400, Colors.deepOrange.shade600]),
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [BoxShadow(color: Colors.orange.withOpacity(0.5), blurRadius: 15, spreadRadius: 2)],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text("⭐", style: TextStyle(fontSize: 24)),
-                        const SizedBox(width: 8),
-                        Text("X2 ${controller.x2Timer.toStringAsFixed(1)}s", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            
+
+            // Combo Indicator
             if (controller.combo > 2)
               Positioned(
-                top: 180,
+                top: Responsive.hp(20),
                 left: 0,
                 right: 0,
                 child: Center(
-                  child: TweenAnimationBuilder(
-                    tween: Tween<double>(begin: 0.8, end: 1.2),
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.elasticOut,
-                    builder: (context, double scale, child) => Transform.scale(scale: scale, child: child),
-                    onEnd: () => setState(() {}),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(colors: [Colors.yellow.shade600, Colors.orange.shade500]),
-                        borderRadius: BorderRadius.circular(30),
-                        boxShadow: [BoxShadow(color: Colors.orange.withOpacity(0.6), blurRadius: 20, spreadRadius: 3)],
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: Responsive.wp(5),
+                      vertical: Responsive.hp(1.5),
+                    ),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Colors.yellow.shade600, Colors.orange.shade500],
                       ),
-                      child: Text("🔥 COMBO x${controller.combo}", style: const TextStyle(fontSize: 32, color: Colors.white, fontWeight: FontWeight.bold, shadows: [Shadow(blurRadius: 10, color: Colors.black45)])),
+                      borderRadius: BorderRadius.circular(Responsive.radius(30)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.orange.withOpacity(0.4),
+                          blurRadius: Responsive.radius(15),
+                          spreadRadius: 2,
+                        )
+                      ],
+                    ),
+                    child: Text(
+                      "COMBO x${controller.combo}",
+                      style: TextStyle(
+                        fontSize: Responsive.fontSize(28),
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
@@ -340,4 +375,3 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
     );
   }
 }
-
