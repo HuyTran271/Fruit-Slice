@@ -85,7 +85,7 @@ class GameController {
     
     final vel = Offset(velocityX, finalVelocityY);
 
-    if (rnd.nextDouble() < 0.78) {
+    if (rnd.nextDouble() < (1 - itemChance)) {
       // Spawn fruits
       int t = rnd.nextInt(6);
       if (t == 0) fruits.add(Apple(Offset(x, spawnY), vel));

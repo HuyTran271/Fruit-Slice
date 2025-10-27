@@ -2,7 +2,6 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'entity.dart';
 import 'Sliceable.dart';
-import 'Particle.dart';
 
 class Fruit extends Entity implements Sliceable {
   @override
@@ -12,7 +11,6 @@ class Fruit extends Entity implements Sliceable {
   String? emoji;
   String? spritePath;
   double rotation = 0;
-  List<Particle> particles = [];
   double scale = 1.0;
 
   Fruit(Offset p, Offset v, this.radius, this.points, {this.emoji, this.spritePath}) : super(p, v);
@@ -23,11 +21,6 @@ class Fruit extends Entity implements Sliceable {
     velocity += const Offset(0, 0.5);
     rotation += 0.08;
     scale = 1.0 + sin(DateTime.now().millisecondsSinceEpoch / 200) * 0.05;
-    
-    for (var particle in particles) {
-      particle.update();
-    }
-    particles.removeWhere((p) => p.isDead);
   }
 
   @override
@@ -38,26 +31,6 @@ class Fruit extends Entity implements Sliceable {
   @override
   void slice() {
     isSliced = true;
-    final rnd = Random();
-    
-    for (int i = 0; i < 12; i++) {
-      particles.add(Particle(
-        position,
-        Offset(rnd.nextDouble() * 8 - 4, rnd.nextDouble() * 8 - 4),
-        color: _getParticleColor(),
-        size: rnd.nextDouble() * 3 + 2,
-      ));
-    }
-  }
-
-  Color _getParticleColor() {
-    if (emoji == "🍎") return Colors.red;
-    if (emoji == "🍐") return Colors.green;
-    if (emoji == "🍊") return Colors.orange;
-    if (emoji == "🍋") return Colors.yellow;
-    if (emoji == "🍉") return Colors.pink;
-    if (emoji == "🍓") return Colors.red;
-    return Colors.white;
   }
 }
 

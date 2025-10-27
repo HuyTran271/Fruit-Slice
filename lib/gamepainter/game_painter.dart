@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../gamecontroller/game_controller.dart';
 import '../entity/slice_effect.dart';
 import '../entity/item.dart';
-import '../entity/particle.dart';
 
 class GamePainter extends CustomPainter {
   final GameController c;
@@ -29,13 +28,6 @@ class GamePainter extends CustomPainter {
 
     // 🎯 Vẽ Fruit
     for (final f in c.fruits) {
-      for (final p in f.particles) {
-        final paint = Paint()
-          ..color = p.color.withOpacity(p.life)
-          ..style = PaintingStyle.fill;
-        canvas.drawCircle(p.position, p.size, paint);
-      }
-
       if (!f.isSliced && f.emoji != null) {
         canvas.save();
         canvas.translate(f.position.dx, f.position.dy);

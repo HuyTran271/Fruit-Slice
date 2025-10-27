@@ -136,7 +136,6 @@ class _GameScreenState extends State<GameScreen>
   }
 
   void _onTick() {
-    _frameCounter++;
     controller.update(screenSize);
     
     for (var effect in sliceEffects) {
@@ -144,12 +143,8 @@ class _GameScreenState extends State<GameScreen>
     }
     sliceEffects.removeWhere((e) => e.isDead);
     
-    if (_frameCounter % _uiUpdateInterval == 0) {
-      if (mounted) {
-        setState(() {
-          lastCombo = controller.combo;
-        });
-      }
+    if (mounted) {
+      setState(() {});
     }
   }
 
@@ -728,6 +723,10 @@ class _GameScreenState extends State<GameScreen>
 
           // Execute slice
           controller.slice(d.localPosition);
+
+          if (controller.combo != prevCombo) {
+            debugPrint('🔥 Combo: ${controller.combo} (prev: $prevCombo)');
+          }
 
           // Sound & haptic
           if (hitFruit) {
