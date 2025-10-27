@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:thuthanh2d/extra/audiomanager.dart';
+import '../extra/audiomanager.dart';
 import '../entity/Fruit.dart';
 import '../entity/Item.dart';
 
@@ -28,6 +28,11 @@ class GameController {
   late int spawnMs;
   late double speedMultiplier;
   late double itemChance;
+
+  // Callbacks để GameScreen kiểm soát sound
+  VoidCallback? onPlaySliceSound;
+  VoidCallback? onPlayBombSound;
+  VoidCallback? onPlayItemSound;
 
   GameController(this.difficulty) {
     if (difficulty == 'Easy') {
@@ -163,7 +168,10 @@ class GameController {
           pts = (pts * (1 + combo * 0.1)).round();
         }
         score += pts;
-        audioManager.playSliceSound();
+        
+        // Gọi callback thay vì gọi trực tiếp audioManager
+        onPlaySliceSound?.call();
+        
         if (score > bestScore) bestScore = score;
       }
     }
@@ -177,14 +185,20 @@ class GameController {
           score = max(0, score - 5);
           lives--;
           combo = 0;
-          audioManager.playBombSound();
+          
+          // Gọi callback thay vì gọi trực tiếp audioManager
+          onPlayBombSound?.call();
         } else if (it is TimeItem) {
           timeLeft += 3;
-          audioManager.playItemSound();
+          
+          // Gọi callback thay vì gọi trực tiếp audioManager
+          onPlayItemSound?.call();
         } else if (it is X2Item) {
           x2Active = true;
           x2Timer = 5.0;
-          audioManager.playItemSound();
+          
+          // Gọi callback thay vì gọi trực tiếp audioManager
+          onPlayItemSound?.call();
         }
       }
     }

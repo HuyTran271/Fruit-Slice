@@ -38,6 +38,7 @@ class _GameScreenState extends State<GameScreen>
   Timer? flashTimer;
   
   bool isSfxEnabled = true;
+  bool isMusicEnabled = true;
   bool isVibrationEnabled = true;
   
   int _frameCounter = 0;
@@ -61,6 +62,24 @@ class _GameScreenState extends State<GameScreen>
     _loadTrail();
     _setFullScreen();
     controller = GameController(widget.difficulty);
+    
+    // Set callback để kiểm soát sound từ GameScreen
+    controller.onPlaySliceSound = () {
+      if (isSfxEnabled) {
+        _playSound('slice');
+      }
+    };
+    controller.onPlayBombSound = () {
+      if (isSfxEnabled) {
+        _playSound('bomb');
+      }
+    };
+    controller.onPlayItemSound = () {
+      if (isSfxEnabled) {
+        _playSound('item'); 
+      }
+    };
+    
     ticker = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 16),
@@ -76,6 +95,7 @@ class _GameScreenState extends State<GameScreen>
     }
     _audioPlayers['combo'] = AudioPlayer();
     _audioPlayers['bomb'] = AudioPlayer();
+    _audioPlayers['item'] = AudioPlayer();
   }
 
   void _setFullScreen() {
@@ -156,6 +176,10 @@ class _GameScreenState extends State<GameScreen>
         final player = _audioPlayers['bomb']!;
         await player.stop();
         await player.play(AssetSource('sounds/bomb.mp3'), volume: 0.7);
+      } else if (sound == 'item') {
+        final player = _audioPlayers['item']!;
+        await player.stop();
+        await player.play(AssetSource('sounds/item.mp3'), volume: 0.6);
       }
     } catch (e) {
       // Ignore audio errors
@@ -168,6 +192,7 @@ class _GameScreenState extends State<GameScreen>
     if (mounted) {
       setState(() {
         isSfxEnabled = prefs.getBool('sfx_enabled') ?? true;
+        isMusicEnabled = prefs.getBool('music_enabled') ?? true;
         isVibrationEnabled = prefs.getBool('vibration_enabled') ?? true;
       });
     }
@@ -176,6 +201,7 @@ class _GameScreenState extends State<GameScreen>
   Future<void> _saveSettings() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('sfx_enabled', isSfxEnabled);
+    await prefs.setBool('music_enabled', isMusicEnabled);
     await prefs.setBool('vibration_enabled', isVibrationEnabled);
   }
 
@@ -297,23 +323,64 @@ class _GameScreenState extends State<GameScreen>
             mainAxisSize: MainAxisSize.min,
             children: [
               SwitchListTile(
-                title: const Text('🔊 Sound Effects'),
-                subtitle: Text(isSfxEnabled ? 'Enabled' : 'Disabled'),
-                value: isSfxEnabled,
+                title: const Text('🎵 Background Music'),
+                subtitle: Text(isMusicEnabled ? 'Enabled' : 'Disabled'),
+                value: isMusicEnabled,
                 activeColor: Colors.green,
-                onChanged: (value) {
+                onChanged: (value) async {
                   setDialogState(() {
                     if (mounted) {
                       setState(() {
-                        isSfxEnabled = value;
-                        _saveSettings();
+                        isMusicEnabled = value;
                       });
                     }
                   });
                   
+                  await _saveSettings();
+                  
                   if (value) {
-                    _playSound('slice');
+                    await controller.audioManager.resumeBackgroundMusic();
+                  } else {
+                    await controller.audioManager.pauseBackgroundMusic();
                   }
+                  
+                  if (!kIsWeb && isVibrationEnabled) {
+                    HapticFeedback.lightImpact();
+                  }
+                },
+              ),
+              const Divider(),
+              SwitchListTile(
+                title: const Text('🔊 Sound Effects'),
+                subtitle: Text(isSfxEnabled ? 'Enabled' : 'Disabled'),
+                value: isSfxEnabled,
+                activeColor: Colors.green,
+                onChanged: (value) async {
+                  // Chỉ play sound khi ĐANG BẬT (từ false -> true)
+                  if (value == true) {
+                    // Phát âm thanh test trước khi update state
+                    try {
+                      final index = _frameCounter % 5;
+                      final player = _audioPlayers['slice_$index']!;
+                      await player.stop();
+                      await player.play(AssetSource('sounds/slice.mp3'), volume: 0.5);
+                    } catch (e) {
+                      debugPrint('Audio error: $e');
+                    }
+                  }
+                  
+                  // Cập nhật state
+                  setDialogState(() {
+                    if (mounted) {
+                      setState(() {
+                        isSfxEnabled = value;
+                      });
+                    }
+                  });
+                  
+                  // Lưu settings
+                  await _saveSettings();
+                  
                   if (!kIsWeb && isVibrationEnabled) {
                     HapticFeedback.lightImpact();
                   }
@@ -326,15 +393,16 @@ class _GameScreenState extends State<GameScreen>
                   subtitle: Text(isVibrationEnabled ? 'Enabled' : 'Disabled'),
                   value: isVibrationEnabled,
                   activeColor: Colors.green,
-                  onChanged: (value) {
+                  onChanged: (value) async {
                     setDialogState(() {
                       if (mounted) {
                         setState(() {
                           isVibrationEnabled = value;
-                          _saveSettings();
                         });
                       }
                     });
+                    
+                    await _saveSettings();
                     
                     if (value) {
                       HapticFeedback.mediumImpact();
@@ -945,7 +1013,7 @@ class _GameScreenState extends State<GameScreen>
               ),
             ),
           ),
-        ],
-      );
-    }
+      ],
+    );
   }
+}
