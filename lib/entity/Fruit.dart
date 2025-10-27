@@ -1,6 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'Entity.dart';
+import 'entity.dart';
 import 'Sliceable.dart';
 import 'Particle.dart';
 

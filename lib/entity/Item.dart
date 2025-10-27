@@ -1,4 +1,4 @@
-import 'Entity.dart';
+import 'entity.dart';
 import 'Sliceable.dart';
 import 'package:flutter/material.dart';
 import 'dart:math';

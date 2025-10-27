@@ -2,11 +2,11 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../entity/AnimatedFruit.dart';
-import 'difficultscreen.dart';
-import '../extra/audiomanager.dart';
+import '../entity/animated_fruit.dart';
+import 'difficult_screen.dart';
+import '../extra/audio_manager.dart';
 import '../extra/leaderboard.dart';
-import 'leaderboardscreen.dart';
+import 'leaderboard_screen.dart';
 import '../responsive/responsive.dart';
 
 // ------------------ START SCREEN ------------------

@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
-import '../extra/audiomanager.dart';
-import '../entity/Fruit.dart';
-import '../entity/Item.dart';
+import '../extra/audio_manager.dart';
+import '../entity/fruit.dart';
+import '../entity/item.dart';
 
 class GameController {
   int score = 0;

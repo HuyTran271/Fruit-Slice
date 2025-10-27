@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../extra/leaderboard.dart';
-import '../extra/audiomanager.dart';
+import '../extra/audio_manager.dart';
 import '../responsive/responsive.dart'; // ✅ dùng responsive chung
-import 'gamescreen.dart';
+import 'game_screen.dart';
 
 class DifficultyScreen extends StatefulWidget {
   const DifficultyScreen({super.key});

@@ -5,12 +5,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:audioplayers/audioplayers.dart';
-import '../gamecontroller/GameController.dart';
-import '../screen/startscreen.dart' as sc;
-import '../gamepainter/GamePainter.dart';
-import '../entity/SliceEffect.dart';
+import '../gamecontroller/game_controller.dart';
+import 'start_screen.dart' as sc;
+import '../gamepainter/game_painter.dart';
+import '../entity/slice_effect.dart';
 import '../extra/leaderboard.dart';
-import '../entity/Item.dart';
+import '../entity/item.dart';
 import '../responsive/responsive.dart';
 
 class GameScreen extends StatefulWidget {

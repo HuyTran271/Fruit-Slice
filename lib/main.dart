@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'screen/startscreen.dart';
+import 'screen/start_screen.dart';
 
 void main() => runApp(const FruitSliceApp());
 

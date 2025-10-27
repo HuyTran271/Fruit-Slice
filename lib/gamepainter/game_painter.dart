@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import '../gamecontroller/GameController.dart';
-import '../entity/SliceEffect.dart';
-import '../entity/Item.dart';
-import '../entity/Particle.dart';
+import '../gamecontroller/game_controller.dart';
+import '../entity/slice_effect.dart';
+import '../entity/item.dart';
+import '../entity/particle.dart';
 
 class GamePainter extends CustomPainter {
   final GameController c;
