@@ -33,8 +33,6 @@ class Item extends Entity implements Sliceable {
     isSliced = true;
     used = true;
   }
-
-  bool containsPoint(Offset pt) => (position - pt).distance <= radius;
 }
 
 class Bomb extends Item {

@@ -1,15 +1,17 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:audioplayers/audioplayers.dart';
 import '../gamecontroller/GameController.dart';
-import '../screen/startscreen.dart';
+import '../screen/startscreen.dart' as sc;
 import '../gamepainter/GamePainter.dart';
 import '../entity/SliceEffect.dart';
 import '../extra/leaderboard.dart';
-import '../extra/audiomanager.dart';
 import '../entity/Item.dart';
-import '../reponsive/reponsive.dart';
+import '../responsive/responsive.dart';
 
 class GameScreen extends StatefulWidget {
   final String difficulty;
@@ -19,7 +21,9 @@ class GameScreen extends StatefulWidget {
   State<GameScreen> createState() => _GameScreenState();
 }
 
-class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateMixin {
+class _GameScreenState extends State<GameScreen> 
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+  
   late GameController controller;
   late AnimationController ticker;
   Size? screenSize;
@@ -28,68 +32,418 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
   List<SliceEffect> sliceEffects = [];
   String currentTrail = 'default';
   List<Color> trailColors = [Colors.red, Colors.yellow];
-  final audioManager = AudioManager();
   int lastCombo = 0;
+  
+  bool showFlash = false;
+  Timer? flashTimer;
+  
+  bool isSfxEnabled = true;
+  bool isVibrationEnabled = true;
+  
+  int _frameCounter = 0;
+  static const int _uiUpdateInterval = 2;
+  DateTime _lastHapticTime = DateTime.now();
+  DateTime _lastSoundTime = DateTime.now();
+  bool _isPaused = false;
+
+  DeviceType _deviceType = DeviceType.mobile;
+  
+  // Audio players
+  final Map<String, AudioPlayer> _audioPlayers = {};
 
   @override
   void initState() {
     super.initState();
-    audioManager.init();
+    WidgetsBinding.instance.addObserver(this);
+    _initAudioPlayers();
+    _loadSettings();
     _loadBest();
     _loadTrail();
+    _setFullScreen();
     controller = GameController(widget.difficulty);
-    ticker = AnimationController(vsync: this, duration: const Duration(milliseconds: 16))
-      ..addListener(() {
-        setState(() {
-          controller.update(screenSize);
-          
-          if (controller.combo > lastCombo && controller.combo > 2) {
-            audioManager.playComboSound();
-          }
-          lastCombo = controller.combo;
-          
-          for (var effect in sliceEffects) {
-            effect.update();
-          }
-          sliceEffects.removeWhere((e) => e.isDead);
-        });
-      })
+    ticker = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 16),
+    )..addListener(_onTick)
       ..repeat();
     controller.startTimer(_onTimeUp);
   }
 
+  void _initAudioPlayers() {
+    // Tạo pool audio players để tránh lag
+    for (int i = 0; i < 5; i++) {
+      _audioPlayers['slice_$i'] = AudioPlayer();
+    }
+    _audioPlayers['combo'] = AudioPlayer();
+    _audioPlayers['bomb'] = AudioPlayer();
+  }
+
+  void _setFullScreen() {
+    // Full screen cho Android/iOS
+    if (!kIsWeb) {
+      SystemChrome.setEnabledSystemUIMode(
+        SystemUiMode.immersiveSticky,
+        overlays: [],
+      );
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _detectDeviceType();
+  }
+
+  void _detectDeviceType() {
+    final size = MediaQuery.of(context).size;
+    final shortestSide = size.shortestSide;
+    
+    if (kIsWeb) {
+      if (size.width > 1200) {
+        _deviceType = DeviceType.desktop;
+      } else if (size.width > 600) {
+        _deviceType = DeviceType.tablet;
+      } else {
+        _deviceType = DeviceType.mobile;
+      }
+    } else {
+      if (shortestSide > 600) {
+        _deviceType = DeviceType.tablet;
+      } else {
+        _deviceType = DeviceType.mobile;
+      }
+    }
+  }
+
+  void _onTick() {
+    _frameCounter++;
+    controller.update(screenSize);
+    
+    for (var effect in sliceEffects) {
+      effect.update();
+    }
+    sliceEffects.removeWhere((e) => e.isDead);
+    
+    if (_frameCounter % _uiUpdateInterval == 0) {
+      if (mounted) {
+        setState(() {
+          lastCombo = controller.combo;
+        });
+      }
+    }
+  }
+
+  Future<void> _playSound(String sound) async {
+    if (!isSfxEnabled) return;
+    
+    // Throttle sounds
+    final now = DateTime.now();
+    if (now.difference(_lastSoundTime).inMilliseconds < 30) return;
+    _lastSoundTime = now;
+    
+    try {
+      if (sound == 'slice') {
+        // Round-robin qua các slice players
+        final index = _frameCounter % 5;
+        final player = _audioPlayers['slice_$index']!;
+        await player.stop();
+        await player.play(AssetSource('sounds/slice.mp3'), volume: 0.5);
+      } else if (sound == 'combo') {
+        final player = _audioPlayers['combo']!;
+        await player.stop();
+        await player.play(AssetSource('sounds/combo.mp3'), volume: 0.6);
+      } else if (sound == 'bomb') {
+        final player = _audioPlayers['bomb']!;
+        await player.stop();
+        await player.play(AssetSource('sounds/bomb.mp3'), volume: 0.7);
+      }
+    } catch (e) {
+      // Ignore audio errors
+      debugPrint('Audio error: $e');
+    }
+  }
+
+  Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        isSfxEnabled = prefs.getBool('sfx_enabled') ?? true;
+        isVibrationEnabled = prefs.getBool('vibration_enabled') ?? true;
+      });
+    }
+  }
+
+  Future<void> _saveSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('sfx_enabled', isSfxEnabled);
+    await prefs.setBool('vibration_enabled', isVibrationEnabled);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    
+    if (state == AppLifecycleState.paused || 
+        state == AppLifecycleState.inactive) {
+      if (!_isPaused) {
+        _pauseGame(showDialog: true);
+      }
+    } else if (state == AppLifecycleState.resumed) {
+      _setFullScreen();
+    }
+  }
+
+  void _pauseGame({bool showDialog = true}) {
+    if (_isPaused || !ticker.isAnimating) return;
+    
+    _isPaused = true;
+    ticker.stop();
+    controller.gameTimer?.cancel();
+    controller.spawnTimer?.cancel();
+    
+    if (controller.fruits.length > 10) {
+      controller.fruits.removeRange(0, controller.fruits.length - 10);
+    }
+    if (controller.items.length > 5) {
+      controller.items.removeRange(0, controller.items.length - 5);
+    }
+    
+    if (showDialog && mounted) {
+      _showPauseDialog();
+    }
+  }
+
+  void _resumeGame() {
+    if (!_isPaused) return;
+    
+    _isPaused = false;
+    _setFullScreen();
+    ticker.repeat();
+    controller.startSpawning();
+    controller.startTimer(_onTimeUp);
+  }
+
+  void _showPauseDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Center(
+          child: Column(
+            children: [
+              Text('⏸️', style: TextStyle(fontSize: 50)),
+              SizedBox(height: 10),
+              Text('Game Paused', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            ],
+          ),
+        ),
+        content: const Text(
+          'Tap Continue để chơi tiếp',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 16),
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(context);
+              _resumeGame();
+            },
+            icon: const Icon(Icons.play_arrow),
+            label: const Text('Continue'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _exitFullScreen();
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (_) => const sc.StartScreen()),
+              );
+            },
+            child: const Text('Quit to Menu'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSettingsDialog() {
+    _pauseGame(showDialog: false);
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Center(
+            child: Column(
+              children: [
+                Text('⚙️', style: TextStyle(fontSize: 50)),
+                SizedBox(height: 10),
+                Text('Settings', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SwitchListTile(
+                title: const Text('🔊 Sound Effects'),
+                subtitle: Text(isSfxEnabled ? 'Enabled' : 'Disabled'),
+                value: isSfxEnabled,
+                activeColor: Colors.green,
+                onChanged: (value) {
+                  setDialogState(() {
+                    if (mounted) {
+                      setState(() {
+                        isSfxEnabled = value;
+                        _saveSettings();
+                      });
+                    }
+                  });
+                  
+                  if (value) {
+                    _playSound('slice');
+                  }
+                  if (!kIsWeb && isVibrationEnabled) {
+                    HapticFeedback.lightImpact();
+                  }
+                },
+              ),
+              const Divider(),
+              if (!kIsWeb)
+                SwitchListTile(
+                  title: const Text('📳 Vibration'),
+                  subtitle: Text(isVibrationEnabled ? 'Enabled' : 'Disabled'),
+                  value: isVibrationEnabled,
+                  activeColor: Colors.green,
+                  onChanged: (value) {
+                    setDialogState(() {
+                      if (mounted) {
+                        setState(() {
+                          isVibrationEnabled = value;
+                          _saveSettings();
+                        });
+                      }
+                    });
+                    
+                    if (value) {
+                      HapticFeedback.mediumImpact();
+                    }
+                  },
+                ),
+            ],
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _resumeGame();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Resume Game'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _exitFullScreen();
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (_) => const sc.StartScreen()),
+                );
+              },
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Quit'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _loadBest() async {
     final p = await SharedPreferences.getInstance();
-    setState(() {
-      bestScore = p.getInt('best_score_${widget.difficulty}') ?? 0;
-      controller.bestScore = bestScore;
-    });
+    if (mounted) {
+      setState(() {
+        bestScore = p.getInt('best_score_${widget.difficulty}') ?? 0;
+        controller.bestScore = bestScore;
+      });
+    }
   }
 
   Future<void> _loadTrail() async {
     final p = await SharedPreferences.getInstance();
-    setState(() {
-      currentTrail = p.getString('current_trail') ?? 'default';
-      switch (currentTrail) {
-        case 'fire': trailColors = [Colors.orange, Colors.red]; break;
-        case 'ice': trailColors = [Colors.cyan, Colors.blue]; break;
-        case 'rainbow': trailColors = [Colors.red, Colors.orange, Colors.yellow, Colors.green, Colors.blue, Colors.purple]; break;
-        case 'lightning': trailColors = [Colors.yellow, Colors.white]; break;
-        case 'toxic': trailColors = [Colors.green, Colors.lime]; break;
-        default: trailColors = [Colors.red, Colors.yellow];
-      }
-    });
+    if (mounted) {
+      setState(() {
+        currentTrail = p.getString('current_trail') ?? 'default';
+        switch (currentTrail) {
+          case 'fire':
+            trailColors = [Colors.orange, Colors.red];
+            break;
+          case 'ice':
+            trailColors = [Colors.cyan, Colors.blue];
+            break;
+          case 'rainbow':
+            trailColors = [Colors.red, Colors.orange, Colors.yellow, Colors.green, Colors.blue, Colors.purple];
+            break;
+          case 'lightning':
+            trailColors = [Colors.yellow, Colors.white];
+            break;
+          case 'toxic':
+            trailColors = [Colors.green, Colors.lime];
+            break;
+          default:
+            trailColors = [Colors.red, Colors.yellow];
+        }
+      });
+    }
   }
 
   Future<void> _saveBest() async {
     final p = await SharedPreferences.getInstance();
     await p.setInt('best_score_${widget.difficulty}', bestScore);
   }
-  
+
   Future<void> _addCoins(int amount) async {
     final p = await SharedPreferences.getInstance();
     final currentCoins = p.getInt('coins') ?? 0;
     await p.setInt('coins', currentCoins + amount);
+  }
+
+  void _triggerFlash() {
+    if (showFlash) return;
+    
+    if (mounted) {
+      setState(() => showFlash = true);
+    }
+    flashTimer?.cancel();
+    flashTimer = Timer(const Duration(milliseconds: 50), () {
+      if (mounted) setState(() => showFlash = false);
+    });
+  }
+
+  void _triggerHaptic() {
+    if (kIsWeb) return;
+    
+    final now = DateTime.now();
+    if (now.difference(_lastHapticTime).inMilliseconds < 50) return;
+    
+    _lastHapticTime = now;
+    if (isVibrationEnabled) {
+      HapticFeedback.lightImpact();
+    }
   }
 
   void _onTimeUp() async {
@@ -98,9 +452,11 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
       _saveBest();
     }
     _addCoins(controller.score);
-    
+
     final playerName = await LeaderboardManager.getPlayerName();
     await LeaderboardManager.saveScore(playerName, widget.difficulty, controller.score);
+
+    if (!mounted) return;
     
     showDialog(
       context: context,
@@ -113,14 +469,21 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
             children: [
               const Text('⏰', style: TextStyle(fontSize: 50)),
               const SizedBox(height: 10),
-              Text(controller.lives <= 0 ? 'Game Over!' : 'Time Up!', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+              Text(
+                controller.lives <= 0 ? 'Game Over!' : 'Time Up!',
+                style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+              ),
             ],
           ),
         ),
         content: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            gradient: LinearGradient(colors: [Colors.purple.shade50, Colors.blue.shade50], begin: Alignment.topLeft, end: Alignment.bottomRight),
+            gradient: LinearGradient(
+              colors: [Colors.purple.shade50, Colors.blue.shade50],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
@@ -143,86 +506,190 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
           ElevatedButton.icon(
             onPressed: () {
               Navigator.pop(context);
-              setState(() => controller.reset());
+              setState(() {
+                controller.reset();
+                _isPaused = false;
+              });
+              _setFullScreen();
+              ticker.repeat();
               controller.startTimer(_onTimeUp);
             },
             icon: const Icon(Icons.replay),
             label: const Text('Play Again'),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
           ),
           ElevatedButton.icon(
             onPressed: () {
               Navigator.pop(context);
-              Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const StartScreen()));
+              _exitFullScreen();
+              Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const sc.StartScreen()));
             },
             icon: const Icon(Icons.home),
             label: const Text('Home'),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
           ),
         ],
       ),
     );
   }
 
+  void _exitFullScreen() {
+    if (!kIsWeb) {
+      SystemChrome.setEnabledSystemUIMode(
+        SystemUiMode.edgeToEdge,
+        overlays: SystemUiOverlay.values,
+      );
+    }
+  }
+
   @override
   void dispose() {
+    _exitFullScreen();
+    WidgetsBinding.instance.removeObserver(this);
     ticker.dispose();
     controller.dispose();
+    flashTimer?.cancel();
+    
+    // Dispose audio players
+    for (var player in _audioPlayers.values) {
+      player.dispose();
+    }
+    
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    Responsive.init(context);
     screenSize = MediaQuery.of(context).size;
     controller.screenSize = screenSize;
+    _detectDeviceType();
 
-    Color difficultyColor = widget.difficulty == 'Easy' ? Colors.green : widget.difficulty == 'Hard' ? Colors.red : Colors.orange;
-    
     return Scaffold(
-      body: GestureDetector(
+      backgroundColor: Colors.black,
+      body: _buildResponsiveBody(),
+    );
+  }
+
+  Widget _buildResponsiveBody() {
+    if (_deviceType == DeviceType.mobile) {
+      // Mobile: Full screen, no container
+      return _buildGameContent();
+    } else {
+      // Tablet/Desktop: Centered with max width
+      return Center(
+        child: Container(
+          constraints: BoxConstraints(
+            maxWidth: _deviceType == DeviceType.tablet ? 600.0 : 800.0,
+            maxHeight: _deviceType == DeviceType.desktop ? 900.0 : double.infinity,
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: _buildGameContent(),
+          ),
+        ),
+      );
+    }
+  }
+
+  Widget _buildGameContent() {
+    final difficultyColor = widget.difficulty == 'Easy' 
+        ? Colors.green 
+        : widget.difficulty == 'Hard' 
+            ? Colors.red 
+            : Colors.orange;
+
+    return SafeArea(
+      // Chỉ apply SafeArea cho mobile
+      top: _deviceType == DeviceType.mobile,
+      bottom: _deviceType == DeviceType.mobile,
+      left: false,
+      right: false,
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onPanStart: (d) {
+          if (_isPaused) return;
+          trail.clear();
+          trail.add(d.localPosition);
+        },
         onPanUpdate: (d) {
+          if (_isPaused) return;
+          
+          trail.add(d.localPosition);
+          if (trail.length > 15) {
+            trail.removeRange(0, trail.length - 15);
+          }
+          
           int prevScore = controller.score;
+          int prevCombo = controller.combo;
           bool hitFruit = false;
           bool hitBomb = false;
-          
+          bool hitItem = false;
+
+          // Check fruits
           for (final f in controller.fruits) {
             if (!f.isSliced && f.contains(d.localPosition)) {
               hitFruit = true;
               break;
             }
           }
-          
-          for (final it in controller.items) {
-            if (!it.used && it.containsPoint(d.localPosition)) {
-              if (it is Bomb) {
-                hitBomb = true;
+
+          // Check items
+          for (final item in controller.items) {
+            if (!item.used) {
+              final dx = d.localPosition.dx - item.position.dx;
+              final dy = d.localPosition.dy - item.position.dy;
+              final distance = sqrt(dx * dx + dy * dy);
+              
+              if (distance < 60) {
+                hitItem = true;
+                if (item is Bomb) {
+                  hitBomb = true;
+                }
+                break;
               }
-              break;
             }
           }
-          
+
+          // Execute slice
           controller.slice(d.localPosition);
-          
+
+          // Sound & haptic
           if (hitFruit) {
-            audioManager.playSliceSound();
+            _triggerHaptic();
+            _triggerFlash();
           } else if (hitBomb) {
-            audioManager.playBombSound();
+            if (!kIsWeb && isVibrationEnabled) {
+              HapticFeedback.heavyImpact();
+            }
+            _triggerFlash();
+          } else if (hitItem) {
+            _triggerHaptic();
           }
-          
+
+          // Combo sound
+          if (controller.combo > prevCombo && controller.combo > 2) {
+            _playSound('combo');
+          }
+
+          // Slice effects
           if (controller.score > prevScore) {
-            sliceEffects.add(SliceEffect(d.localPosition, '+${controller.score - prevScore}'));
+            if (sliceEffects.length < 5) {
+              sliceEffects.add(SliceEffect(d.localPosition, '+${controller.score - prevScore}'));
+            }
           }
-          
-          setState(() {
-            trail.add(d.localPosition);
-            if (trail.length > 25) trail.removeAt(0);
-          });
         },
-        onPanEnd: (_) => setState(() => trail.clear()),
+        onPanEnd: (_) => trail.clear(),
+        onPanCancel: () => trail.clear(),
         child: Stack(
           children: [
-            // Background
             Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -234,144 +701,251 @@ class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateM
                 ),
               ),
             ),
-
-            // Game Canvas với kích thước responsive
-            CustomPaint(
-              size: Size(Responsive.screenWidth, Responsive.screenHeight),
-              painter: GamePainter(
-                controller,
-                trail,
-                sliceEffects,
-                trailColors,
-                devicePixelRatio: Responsive.devicePixelRatio,
+            
+            if (showFlash)
+              Container(color: Colors.white.withOpacity(0.15)),
+            
+            RepaintBoundary(
+              child: CustomPaint(
+                size: Size.infinite,
+                painter: GamePainter(controller, trail, sliceEffects, trailColors),
               ),
             ),
 
-            // Score Panel
-            Positioned(
-              top: Responsive.hp(4), // 4% chiều cao màn hình
-              left: Responsive.wp(4), // 4% chiều rộng màn hình
-              right: Responsive.wp(4),
-              child: Container(
-                padding: EdgeInsets.all(Responsive.wp(3)),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.95),
-                  borderRadius: BorderRadius.circular(Responsive.radius(20)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: Responsive.radius(10),
-                      offset: Offset(0, Responsive.hp(0.5)),
-                    )
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    // Score Section
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "Score: ${controller.score}",
-                            style: TextStyle(
-                              fontSize: Responsive.fontSize(24),
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Text(
-                            "Best: $bestScore",
-                            style: TextStyle(
-                              fontSize: Responsive.fontSize(16),
-                              color: Colors.grey,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    // Timer Section
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: Responsive.wp(3),
-                            vertical: Responsive.hp(1),
-                          ),
-                          decoration: BoxDecoration(
-                            color: controller.timeLeft <= 10
-                                ? Colors.red.withOpacity(0.2)
-                                : Colors.blue.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(Responsive.radius(10)),
-                          ),
-                          child: Text(
-                            "${controller.timeLeft}s",
-                            style: TextStyle(
-                              fontSize: Responsive.fontSize(20),
-                              fontWeight: FontWeight.bold,
-                              color: controller.timeLeft <= 10 ? Colors.red : Colors.blue,
-                            ),
-                          ),
-                        ),
-                        SizedBox(height: Responsive.hp(1)),
-                        Row(
-                          children: List.generate(
-                            controller.lives,
-                            (i) => Padding(
-                              padding: EdgeInsets.only(left: Responsive.wp(1)),
-                              child: Text(
-                                "❤️",
-                                style: TextStyle(fontSize: Responsive.fontSize(20)),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // Combo Indicator
-            if (controller.combo > 2)
-              Positioned(
-                top: Responsive.hp(20),
-                left: 0,
-                right: 0,
-                child: Center(
-                  child: Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: Responsive.wp(5),
-                      vertical: Responsive.hp(1.5),
-                    ),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Colors.yellow.shade600, Colors.orange.shade500],
-                      ),
-                      borderRadius: BorderRadius.circular(Responsive.radius(30)),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.orange.withOpacity(0.4),
-                          blurRadius: Responsive.radius(15),
-                          spreadRadius: 2,
-                        )
-                      ],
-                    ),
-                    child: Text(
-                      "COMBO x${controller.combo}",
-                      style: TextStyle(
-                        fontSize: Responsive.fontSize(28),
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+            _buildResponsiveUI(difficultyColor),
           ],
         ),
       ),
     );
   }
-}
+
+  Widget _buildResponsiveUI(Color difficultyColor) {
+    final ResponsiveConfig config = getResponsiveConfig(context);
+
+    return Stack(
+      children: [
+        Positioned(
+          top: config.topPadding,
+          left: config.sidePadding,
+          right: config.sidePadding + config.settingsButtonSize + 8,
+          child: Container(
+            padding: EdgeInsets.all(config.panelPadding),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.92),
+              borderRadius: BorderRadius.circular(config.borderRadius),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                )
+              ],
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: config.badgePadding,
+                          vertical: config.badgePadding * 0.5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: difficultyColor.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          widget.difficulty,
+                          style: TextStyle(
+                            fontSize: config.smallTextSize,
+                            fontWeight: FontWeight.bold,
+                            color: difficultyColor,
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: config.spacing),
+                      Text(
+                        "🏆 ${controller.score}",
+                        style: TextStyle(
+                          fontSize: config.scoreFontSize,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        "Best: $bestScore",
+                        style: TextStyle(
+                          fontSize: config.smallTextSize,
+                          color: Colors.black54,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                
+                SizedBox(width: config.spacing),
+                
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: config.badgePadding,
+                        vertical: config.badgePadding * 0.6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: controller.timeLeft <= 10
+                            ? Colors.red.withOpacity(0.15)
+                            : Colors.blue.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        "⏱️ ${controller.timeLeft}s",
+                        style: TextStyle(
+                          fontSize: config.timeFontSize,
+                          fontWeight: FontWeight.bold,
+                          color: controller.timeLeft <= 10 ? Colors.red : Colors.blue,
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: config.spacing),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: List.generate(
+                        controller.lives,
+                        (i) => Padding(
+                          padding: EdgeInsets.only(left: config.spacing * 0.5),
+                          child: Text(
+                            "❤️",
+                            style: TextStyle(fontSize: config.heartSize),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        Positioned(
+          top: config.topPadding,
+          right: config.sidePadding,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: _showSettingsDialog,
+              borderRadius: BorderRadius.circular(config.settingsButtonSize / 2),
+              child: Container(
+                width: config.settingsButtonSize,
+                height: config.settingsButtonSize,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.92),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 4,
+                    )
+                  ],
+                ),
+                child: Icon(
+                  Icons.settings,
+                  color: Colors.black87,
+                  size: config.iconSize,
+                ),
+              ),
+            ),
+          ),
+        ),
+
+        if (controller.x2Active)
+          Positioned(
+            top: config.topPadding + config.settingsButtonSize + 16,
+            right: config.sidePadding,
+            child: Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: config.badgePadding,
+                vertical: config.badgePadding * 0.7,
+              ),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.orange.shade400, Colors.deepOrange.shade500],
+                ),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.orange.withOpacity(0.3),
+                    blurRadius: 8,
+                    spreadRadius: 1,
+                  )
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    "⭐",
+                    style: TextStyle(fontSize: config.timeFontSize),
+                  ),
+                  SizedBox(width: config.spacing * 0.7),
+                  Text(
+                    "X2",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: config.timeFontSize,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+        if (controller.combo > 2)
+          Positioned(
+            top: config.comboTop,
+            left: config.sidePadding,
+            right: config.sidePadding,
+            child: Center(
+              child: Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: config.badgePadding * 1.5,
+                  vertical: config.badgePadding,
+                ),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.yellow.shade600, Colors.orange.shade500],
+                  ),
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.orange.withOpacity(0.4),
+                      blurRadius: 12,
+                      spreadRadius: 2,
+                    )
+                  ],
+                ),
+                child: Text(
+                  "🔥 COMBO x${controller.combo}",
+                  style: TextStyle(
+                    fontSize: config.comboFontSize,
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+  }

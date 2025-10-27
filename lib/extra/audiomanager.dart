@@ -12,9 +12,9 @@
     
     bool isSfxEnabled = true;
     bool isMusicEnabled = true;
-    double musicVolume = 0.3;
+    double musicVolume = 0.1;
     double sfxVolume = 0.7;
-    double _effectsVolume = 0.5;
+    double _effectsVolume = 1.0;
 
     double get effectsVolume => _effectsVolume;
 
@@ -31,7 +31,7 @@
       // Load volume từ SharedPreferences khi khởi động
     Future<void> loadSettings() async {
       final prefs = await SharedPreferences.getInstance();
-      _effectsVolume = prefs.getDouble('effects_volume') ?? 0.5;
+      _effectsVolume = prefs.getDouble('effects_volume') ?? 1.0;
       await _sfxPlayer.setVolume(_effectsVolume);
     }
 
@@ -39,7 +39,7 @@
       final prefs = await SharedPreferences.getInstance();
       isSfxEnabled = prefs.getBool('sfx_enabled') ?? true;
       isMusicEnabled = prefs.getBool('music_enabled') ?? true;
-      musicVolume = prefs.getDouble('music_volume') ?? 1.0;
+      musicVolume = prefs.getDouble('music_volume') ?? 0.1;
       sfxVolume = prefs.getDouble('sfx_volume') ?? 0.7;
       
       // Cấu hình BGM player để loop

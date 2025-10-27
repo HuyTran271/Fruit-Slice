@@ -1,9 +1,10 @@
 import 'dart:async';
-import 'dart:math';
 import 'package:flutter/material.dart';
-import 'gamescreen.dart';
 import '../extra/leaderboard.dart';
 import '../extra/audiomanager.dart';
+import '../responsive/responsive.dart'; // ✅ dùng responsive chung
+import 'gamescreen.dart';
+
 class DifficultyScreen extends StatefulWidget {
   const DifficultyScreen({super.key});
 
@@ -13,7 +14,7 @@ class DifficultyScreen extends StatefulWidget {
 
 class _DifficultyScreenState extends State<DifficultyScreen> {
   String playerName = 'Player';
-  AudioManager audioManager = AudioManager();
+  final AudioManager audioManager = AudioManager();
 
   @override
   void initState() {
@@ -28,7 +29,7 @@ class _DifficultyScreenState extends State<DifficultyScreen> {
 
   Future<void> _showNameInputDialog(String difficulty) async {
     final controller = TextEditingController(text: playerName);
-    
+
     final result = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
@@ -37,14 +38,13 @@ class _DifficultyScreenState extends State<DifficultyScreen> {
         backgroundColor: Colors.white,
         title: Column(
           children: [
-            Text(
-              _getDifficultyEmoji(difficulty),
-              style: const TextStyle(fontSize: 50),
-            ),
+            Text(_getDifficultyEmoji(difficulty),
+                style: const TextStyle(fontSize: 50)),
             const SizedBox(height: 10),
             Text(
               'Ready to play $difficulty?',
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              style:
+                  const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
             ),
           ],
@@ -52,10 +52,8 @@ class _DifficultyScreenState extends State<DifficultyScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
-              'Enter your name:',
-              style: TextStyle(fontSize: 16, color: Colors.black87),
-            ),
+            const Text('Enter your name:',
+                style: TextStyle(fontSize: 16, color: Colors.black87)),
             const SizedBox(height: 15),
             TextField(
               controller: controller,
@@ -64,17 +62,20 @@ class _DifficultyScreenState extends State<DifficultyScreen> {
                 hintText: 'Player Name',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(15),
-                  borderSide: BorderSide(color: _getDifficultyColor(difficulty)),
+                  borderSide:
+                      BorderSide(color: _getDifficultyColor(difficulty)),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(15),
-                  borderSide: BorderSide(color: _getDifficultyColor(difficulty), width: 2),
+                  borderSide: BorderSide(
+                      color: _getDifficultyColor(difficulty), width: 2),
                 ),
                 filled: true,
                 fillColor: Colors.grey[100],
               ),
               maxLength: 15,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                  fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 10),
             Container(
@@ -83,18 +84,14 @@ class _DifficultyScreenState extends State<DifficultyScreen> {
                 color: _getDifficultyColor(difficulty).withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Column(
-                children: [
-                  Text(
-                    _getDifficultyInfo(difficulty),
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: _getDifficultyColor(difficulty),
-                      fontWeight: FontWeight.bold,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
+              child: Text(
+                _getDifficultyInfo(difficulty),
+                style: TextStyle(
+                  fontSize: 14,
+                  color: _getDifficultyColor(difficulty),
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
               ),
             ),
           ],
@@ -103,13 +100,8 @@ class _DifficultyScreenState extends State<DifficultyScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            ),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(fontSize: 16, color: Colors.grey),
-            ),
+            child: const Text('Cancel',
+                style: TextStyle(fontSize: 16, color: Colors.grey)),
           ),
           ElevatedButton(
             onPressed: () {
@@ -121,16 +113,15 @@ class _DifficultyScreenState extends State<DifficultyScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: _getDifficultyColor(difficulty),
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(15),
               ),
-              elevation: 5,
             ),
-            child: const Text(
-              'Start Game',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
+            child: const Text('Start Game',
+                style:
+                    TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -141,7 +132,8 @@ class _DifficultyScreenState extends State<DifficultyScreen> {
       if (mounted) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => GameScreen(difficulty: difficulty)),
+          MaterialPageRoute(
+              builder: (_) => GameScreen(difficulty: difficulty)),
         );
       }
     }
@@ -149,17 +141,23 @@ class _DifficultyScreenState extends State<DifficultyScreen> {
 
   String _getDifficultyEmoji(String difficulty) {
     switch (difficulty) {
-      case 'Easy': return '😊';
-      case 'Hard': return '😈';
-      default: return '😎';
+      case 'Easy':
+        return '😊';
+      case 'Hard':
+        return '😈';
+      default:
+        return '😎';
     }
   }
 
   Color _getDifficultyColor(String difficulty) {
     switch (difficulty) {
-      case 'Easy': return Colors.green;
-      case 'Hard': return Colors.red;
-      default: return Colors.orange;
+      case 'Easy':
+        return Colors.green;
+      case 'Hard':
+        return Colors.red;
+      default:
+        return Colors.orange;
     }
   }
 
@@ -176,6 +174,8 @@ class _DifficultyScreenState extends State<DifficultyScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final config = getResponsiveConfig(context);
+
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -185,65 +185,69 @@ class _DifficultyScreenState extends State<DifficultyScreen> {
             end: Alignment.bottomCenter,
           ),
         ),
-        width: double.infinity,
-        height: double.infinity,
         child: SafeArea(
           child: Column(
             children: [
-              const SizedBox(height: 20),
+              SizedBox(height: config.topPadding * 2),
               Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
+                    icon: const Icon(Icons.arrow_back,
+                        color: Colors.white, size: 28),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
               ),
               const Spacer(),
-              const Text(
+              Text(
                 "Chọn độ khó",
                 style: TextStyle(
-                  fontSize: 36,
+                  fontSize: config.scoreFontSize + 10,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
-                  shadows: [
+                  shadows: const [
                     Shadow(
-                      blurRadius: 10,
-                      color: Colors.black45,
-                      offset: Offset(0, 4),
-                    )
+                        blurRadius: 10,
+                        color: Colors.black45,
+                        offset: Offset(0, 4))
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
+              SizedBox(height: config.spacing * 6),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                padding: EdgeInsets.symmetric(
+                    horizontal: config.sidePadding * 3,
+                    vertical: config.panelPadding),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(15),
+                  borderRadius: BorderRadius.circular(config.borderRadius),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.person, color: Colors.white, size: 20),
+                    Icon(Icons.person,
+                        color: Colors.white, size: config.iconSize),
                     const SizedBox(width: 8),
                     Text(
                       playerName,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: Colors.white,
-                        fontSize: 18,
+                        fontSize: config.timeFontSize + 2,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 50),
-              _buildDifficultyButton(context, "Easy", Colors.green, "😊"),
-              const SizedBox(height: 20),
-              _buildDifficultyButton(context, "Normal", Colors.orange, "😎"),
-              const SizedBox(height: 20),
-              _buildDifficultyButton(context, "Hard", Colors.red, "😈"),
+              SizedBox(height: config.spacing * 8),
+              _buildDifficultyButton(
+                  context, "Easy", Colors.green, "😊", config),
+              SizedBox(height: config.spacing * 4),
+              _buildDifficultyButton(
+                  context, "Normal", Colors.orange, "😎", config),
+              SizedBox(height: config.spacing * 4),
+              _buildDifficultyButton(
+                  context, "Hard", Colors.red, "😈", config),
               const Spacer(),
             ],
           ),
@@ -252,43 +256,34 @@ class _DifficultyScreenState extends State<DifficultyScreen> {
     );
   }
 
-  Widget _buildDifficultyButton(
-    BuildContext context,
-    String text,
-    Color color,
-    String emoji,
-  ) {
-    final delay = text == "Easy" ? 0 : text == "Normal" ? 200 : 400;
-    
-    return TweenAnimationBuilder(
-      tween: Tween<double>(begin: 0, end: 1),
-      duration: Duration(milliseconds: 500 + delay),
-      curve: Curves.elasticOut,
-      builder: (context, double value, child) => Transform.scale(
-        scale: value,
-        child: child,
+  Widget _buildDifficultyButton(BuildContext context, String text,
+      Color color, String emoji, ResponsiveConfig config) {
+    return ElevatedButton(
+      onPressed: () => _showNameInputDialog(text),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.white,
+        foregroundColor: color,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(config.borderRadius * 2),
+        ),
+        padding: EdgeInsets.symmetric(
+          horizontal: config.panelPadding * 6,
+          vertical: config.panelPadding * 2,
+        ),
+        textStyle: TextStyle(
+          fontSize: config.comboFontSize,
+          fontWeight: FontWeight.bold,
+        ),
+        elevation: 8,
+        shadowColor: color,
       ),
-      child: ElevatedButton(
-        onPressed: () => _showNameInputDialog(text),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.white,
-          foregroundColor: color,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(30),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 60, vertical: 18),
-          textStyle: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-          elevation: 8,
-          shadowColor: color,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(emoji, style: const TextStyle(fontSize: 24)),
-            const SizedBox(width: 10),
-            Text(text),
-          ],
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(emoji, style: TextStyle(fontSize: config.timeFontSize + 12)),
+          const SizedBox(width: 10),
+          Text(text),
+        ],
       ),
     );
   }
