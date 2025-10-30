@@ -153,56 +153,54 @@ class GameController {
   }
 
   void slice(Offset p) {
-    bool hitAny = false;
-    
-    for (final f in fruits) {
-      if (!f.isSliced && f.contains(p)) {
-        f.slice();
-        hitAny = true;
-        combo++;
-        if (combo > maxCombo) maxCombo = combo;
-        comboTimer = 1.5;
-        
-        int pts = x2Active ? f.points * 2 : f.points;
-        if (combo > 2) {
-          pts = (pts * (1 + combo * 0.1)).round();
-        }
-        score += pts;
-        
-        // Gọi callback thay vì gọi trực tiếp audioManager
-        onPlaySliceSound?.call();
-        
-        if (score > bestScore) bestScore = score;
-      }
-    }
-    
-    if (!hitAny) combo = 0;
-    
-    for (final it in items) {
-      if (!it.used && it.contains(p)) {
-        it.used = true;
-        if (it is Bomb) {
-          score = max(0, score - 5);
-          lives--;
-          combo = 0;
+      bool hitAny = false;
+      
+      for (final f in fruits) {
+        if (!f.isSliced && f.contains(p)) {
+          f.slice();
+          hitAny = true;
+          combo++;
           
-          // Gọi callback thay vì gọi trực tiếp audioManager
-          onPlayBombSound?.call();
-        } else if (it is TimeItem) {
-          timeLeft += 3;
+          // ⭐ DEBUG
+          print('🔥 COMBO: $combo (Timer reset to 1.5s)');
           
-          // Gọi callback thay vì gọi trực tiếp audioManager
-          onPlayItemSound?.call();
-        } else if (it is X2Item) {
-          x2Active = true;
-          x2Timer = 5.0;
+          if (combo > maxCombo) maxCombo = combo;
+          comboTimer = 2.0;  // ⭐ TĂNG lên 2s để dễ giữ combo
           
-          // Gọi callback thay vì gọi trực tiếp audioManager
-          onPlayItemSound?.call();
+          int pts = x2Active ? f.points * 2 : f.points;
+          if (combo > 2) {
+            pts = (pts * (1 + combo * 0.1)).round();
+            print('💰 Bonus: ${combo}x → +$pts pts');
+          }
+          score += pts;
+          
+          onPlaySliceSound?.call();
+          
+          if (score > bestScore) bestScore = score;
         }
       }
+      
+      for (final it in items) {
+        if (!it.used && it.contains(p)) {
+          it.used = true;
+          if (it is Bomb) {
+            score = max(0, score - 5);
+            lives--;
+            combo = 0;  // ✅ Chỉ reset khi chạm bomb
+            print('💣 BOMB! Combo reset to 0');
+            
+            onPlayBombSound?.call();
+          } else if (it is TimeItem) {
+            timeLeft += 3;
+            onPlayItemSound?.call();
+          } else if (it is X2Item) {
+            x2Active = true;
+            x2Timer = 5.0;
+            onPlayItemSound?.call();
+          }
+        }
+      }
     }
-  }
 
   void reset() {
     score = 0;
