@@ -2,8 +2,11 @@ import 'entity.dart';
 import 'Sliceable.dart';
 import 'package:flutter/material.dart';
 import 'dart:math';
+import '../gamecontroller/game_controller.dart';
 
-class Item extends Entity implements Sliceable {
+abstract class Item extends Entity implements Sliceable {
+  GameController? gameController;
+
   @override
   bool isSliced = false;
   double radius;
@@ -13,7 +16,8 @@ class Item extends Entity implements Sliceable {
   double rotation = 0;
   double glow = 0;
 
-  Item(Offset p, Offset v, this.radius, {this.emoji, this.spritePath}) : super(p, v);
+  Item(this.gameController, Offset p, Offset v, this.radius, {this.emoji, this.spritePath})
+      : super(p, v);
 
   @override
   void update() {
@@ -29,20 +33,47 @@ class Item extends Entity implements Sliceable {
   }
 
   @override
-  void slice() {
-    isSliced = true;
-    used = true;
-  }
+  void slice();
 }
 
 class Bomb extends Item {
-  Bomb(Offset p, Offset v) : super(p, v, 28, emoji: "💣");
+  Bomb(GameController gc, Offset p, Offset v) : super(gc, p, v, 28, emoji: "💣");
+
+  @override
+  void slice() {
+    isSliced = true;
+    used = true;
+    gameController?.score = max(0, gameController!.score - 5);
+    gameController?.lives--;
+    gameController?.combo = 0;
+
+    gameController?.onPlayBombSound?.call();
+  }
 }
 
 class TimeItem extends Item {
-  TimeItem(Offset p, Offset v) : super(p, v, 24, emoji: "⏰");
+  TimeItem(GameController gc, Offset p, Offset v) : super(gc, p, v, 24, emoji: "⏰");
+
+  @override
+  void slice() {
+    isSliced = true;
+    used = true;
+    gameController?.timeLeft += 3;
+
+    gameController?.onPlayItemSound?.call();
+  }
 }
 
 class X2Item extends Item {
-  X2Item(Offset p, Offset v) : super(p, v, 24, emoji: "⭐");
+  X2Item(GameController gc, Offset p, Offset v) : super(gc, p, v, 24, emoji: "⭐");
+
+  
+  @override
+  void slice() {
+    isSliced = true;
+    used = true;
+    gameController?.x2Active = true;
+    gameController?.x2Timer = 5.0;
+    gameController?.onPlayItemSound?.call();
+  }
 }

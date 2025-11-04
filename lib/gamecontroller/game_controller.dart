@@ -6,14 +6,14 @@ import '../entity/fruit.dart';
 import '../entity/item.dart';
 
 class GameController {
-  int score = 0;
-  int lives = 3;
+  int _score = 0;
+  int _lives = 3;
   bool x2Active = false;
   double x2Timer = 0;
   int timeLeft = 45;
   int bestScore = 0;
-  int combo = 0;
-  int maxCombo = 0;
+  int _combo = 0;
+  int _maxCombo = 0;
   double comboTimer = 0;
   AudioManager audioManager = AudioManager();
 
@@ -33,6 +33,25 @@ class GameController {
   VoidCallback? onPlaySliceSound;
   VoidCallback? onPlayBombSound;
   VoidCallback? onPlayItemSound;
+
+  int get score => _score;
+  int get lives => _lives;
+  int get combo => _combo;
+  int get maxCombo => _maxCombo;
+
+  set score(int val) {
+    _score = val;
+  }
+  set lives(int val) {
+    _lives = val;
+  }
+  set combo(int val) {
+    _combo = val;
+    if (_combo > _maxCombo) _maxCombo = _combo;
+  }
+  set maxCombo(int val) {
+    _maxCombo = val;
+  }
 
   GameController(this.difficulty) {
     if (difficulty == 'Easy') {
@@ -97,9 +116,9 @@ class GameController {
     } else {
       // Spawn items
       int t = rnd.nextInt(3);
-      if (t == 0) items.add(Bomb(Offset(x, spawnY), vel));
-      if (t == 1) items.add(TimeItem(Offset(x, spawnY), vel));
-      if (t == 2) items.add(X2Item(Offset(x, spawnY), vel));
+      if (t == 0) items.add(Bomb(this, Offset(x, spawnY), vel));
+      if (t == 1) items.add(TimeItem(this, Offset(x, spawnY), vel));
+      if (t == 2) items.add(X2Item(this, Offset(x, spawnY), vel));
     }
   }
 
@@ -153,54 +172,43 @@ class GameController {
   }
 
   void slice(Offset p) {
-      bool hitAny = false;
-      
-      for (final f in fruits) {
-        if (!f.isSliced && f.contains(p)) {
-          f.slice();
-          hitAny = true;
-          combo++;
-          
-          // ⭐ DEBUG
-          print('🔥 COMBO: $combo (Timer reset to 1.5s)');
-          
-          if (combo > maxCombo) maxCombo = combo;
-          comboTimer = 2.0;  // ⭐ TĂNG lên 2s để dễ giữ combo
-          
-          int pts = x2Active ? f.points * 2 : f.points;
-          if (combo > 2) {
-            pts = (pts * (1 + combo * 0.1)).round();
-            print('💰 Bonus: ${combo}x → +$pts pts');
-          }
-          score += pts;
-          
-          onPlaySliceSound?.call();
-          
-          if (score > bestScore) bestScore = score;
+    bool hitAny = false;
+    
+    for (final f in fruits) {
+      if (!f.isSliced && f.contains(p)) {
+        f.slice();
+        hitAny = true;
+        combo++;
+        
+        // ⭐ DEBUG
+        print('🔥 COMBO: $combo (Timer reset to 1.5s)');
+        
+        if (combo > maxCombo) maxCombo = combo;
+        comboTimer = 2.0;  // ⭐ TĂNG lên 2s để dễ giữ combo
+        
+        int pts = x2Active ? f.points * 2 : f.points;
+        if (combo > 2) {
+          pts = (pts * (1 + combo * 0.1)).round();
+          print('💰 Bonus: ${combo}x → +$pts pts');
         }
-      }
-      
-      for (final it in items) {
-        if (!it.used && it.contains(p)) {
-          it.used = true;
-          if (it is Bomb) {
-            score = max(0, score - 5);
-            lives--;
-            combo = 0;  // ✅ Chỉ reset khi chạm bomb
-            print('💣 BOMB! Combo reset to 0');
-            
-            onPlayBombSound?.call();
-          } else if (it is TimeItem) {
-            timeLeft += 3;
-            onPlayItemSound?.call();
-          } else if (it is X2Item) {
-            x2Active = true;
-            x2Timer = 5.0;
-            onPlayItemSound?.call();
-          }
-        }
+        score += pts;
+        
+        onPlaySliceSound?.call();
+        
+        if (score > bestScore) bestScore = score;
       }
     }
+    
+    // ⭐ BỎ DÒNG NÀY để combo không reset khi vuốt trượt
+    // if (!hitAny) combo = 0;
+    
+    for (final it in items) {
+      if (!it.used && it.contains(p)) {
+        it.slice();
+        hitAny = true;
+      }
+    }
+  }
 
   void reset() {
     score = 0;
