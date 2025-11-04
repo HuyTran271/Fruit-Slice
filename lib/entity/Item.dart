@@ -41,6 +41,7 @@ class Bomb extends Item {
 
   @override
   void slice() {
+    if (used) return;
     isSliced = true;
     used = true;
     gameController.score = max(0, gameController.score - 5);
@@ -56,6 +57,7 @@ class TimeItem extends Item {
 
   @override
   void slice() {
+    if (used) return;
     isSliced = true;
     used = true;
     gameController.timeLeft += 3;
@@ -70,6 +72,7 @@ class X2Item extends Item {
   
   @override
   void slice() {
+    if (used) return;
     isSliced = true;
     used = true;
     gameController.x2Active = true;
