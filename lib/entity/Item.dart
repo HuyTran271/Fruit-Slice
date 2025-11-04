@@ -5,7 +5,7 @@ import 'dart:math';
 import '../gamecontroller/game_controller.dart';
 
 abstract class Item extends Entity implements Sliceable {
-  GameController? gameController;
+  GameController gameController;
 
   @override
   bool isSliced = false;
@@ -43,11 +43,11 @@ class Bomb extends Item {
   void slice() {
     isSliced = true;
     used = true;
-    gameController?.score = max(0, gameController!.score - 5);
-    gameController?.lives--;
-    gameController?.combo = 0;
+    gameController.score = max(0, gameController.score - 5);
+    gameController.lives--;
+    gameController.combo = 0;
 
-    gameController?.onPlayBombSound?.call();
+    gameController.onPlayBombSound?.call();
   }
 }
 
@@ -58,9 +58,9 @@ class TimeItem extends Item {
   void slice() {
     isSliced = true;
     used = true;
-    gameController?.timeLeft += 3;
+    gameController.timeLeft += 3;
 
-    gameController?.onPlayItemSound?.call();
+    gameController.onPlayItemSound?.call();
   }
 }
 
@@ -72,8 +72,8 @@ class X2Item extends Item {
   void slice() {
     isSliced = true;
     used = true;
-    gameController?.x2Active = true;
-    gameController?.x2Timer = 5.0;
-    gameController?.onPlayItemSound?.call();
+    gameController.x2Active = true;
+    gameController.x2Timer = 5.0;
+    gameController.onPlayItemSound?.call();
   }
 }
